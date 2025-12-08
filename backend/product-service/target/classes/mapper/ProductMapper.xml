@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cshp.product.mapper.ProductMapper">
+
+    <select id="selectBySellerId" resultType="com.cshp.product.entity.Product">
+        SELECT * FROM product WHERE seller_id = #{sellerId} ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByKeyword" resultType="com.cshp.product.entity.Product">
+        SELECT * FROM product 
+        WHERE status = 0 
+        AND (title LIKE CONCAT('%', #{keyword}, '%') 
+        OR description LIKE CONCAT('%', #{keyword}, '%'))
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByCategory" resultType="com.cshp.product.entity.Product">
+        SELECT * FROM product 
+        WHERE status = 0 AND category = #{category}
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>
+

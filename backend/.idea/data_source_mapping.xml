@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/ai-service2/src/main/java/com/cshp/aiservice2/repository/OrderRepository.java" value="7049722e-1be6-4f75-8536-538f0f56ae37" />
+    <file url="file://$PROJECT_DIR$/ai-service2/src/main/java/com/cshp/aiservice2/repository/ProductRepository.java" value="7049722e-1be6-4f75-8536-538f0f56ae37" />
+  </component>
+</project>
