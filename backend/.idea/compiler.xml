@@ -8,6 +8,14 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="ai-service2" />
+        <module name="cart-service" />
+        <module name="common" />
+        <module name="gateway-service" />
+        <module name="search-service" />
+        <module name="product-service" />
+        <module name="chat-service" />
+        <module name="order-service" />
+        <module name="user-service" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
