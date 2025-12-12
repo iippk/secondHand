@@ -1,0 +1,80 @@
+server:
+  port: 8080
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration
+
+  application:
+    name: gateway-service
+  main:
+    web-application-type: reactive
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    sentinel:
+      transport:
+        dashboard: localhost:18080
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/user-service/**
+          filters:
+            - StripPrefix=2
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/product-service/**
+          filters:
+            - StripPrefix=2
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order-service/**
+          filters:
+            - StripPrefix=2
+        - id: search-service
+          uri: lb://search-service
+          predicates:
+            - Path=/api/search-service/**
+          filters:
+            - StripPrefix=2
+        - id: chat-service
+          uri: lb://chat-service
+          predicates:
+            - Path=/api/chat-service/**
+          filters:
+            - StripPrefix=2
+        - id: cart-service
+          uri: lb://cart-service
+          predicates:
+            - Path=/api/cart-service/**
+          filters:
+            - StripPrefix=2
+        - id: product-service-static
+          uri: lb://product-service
+          predicates:
+            - Path=/uploads/**
+          filters:
+            - StripPrefix=0
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+
+jwt:
+  secret: cshp-secret-key-for-jwt-token-generation-2024
+  expiration: 86400000
+
