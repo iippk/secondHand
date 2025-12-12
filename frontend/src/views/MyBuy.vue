@@ -570,10 +570,10 @@ const showPaymentDialog = (order) => {
   // 重置表单
   Object.assign(paymentForm, {
     paymentMethod: 'alipay',
-    receiverName: order.buyerName || '',
-    phone: order.phone || '',
-    address: order.address || '',
-    remark: order.remark || ''
+    receiverName: '',
+    phone: '',
+    address: '',
+    remark: ''
   })
   paymentDialogVisible.value = true
 }
@@ -1637,4 +1637,7 @@ onMounted(() => {
     flex-direction: column;
   }
 }
+
+
+
 </style>

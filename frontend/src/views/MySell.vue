@@ -1701,4 +1701,6 @@ onMounted(() => {
   font-size: 12px;
   box-shadow: 0 2px 6px rgba(255, 152, 0, 0.2);
 }
+
+
 </style>

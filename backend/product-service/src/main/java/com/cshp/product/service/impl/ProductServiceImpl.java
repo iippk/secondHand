@@ -8,7 +8,7 @@ import com.cshp.product.entity.Product;
 import com.cshp.product.mapper.ProductMapper;
 import com.cshp.product.service.ProductService;
 import com.cshp.product.client.UserServiceClient;
-import com.cshp.user.dto.UserDTO;
+import com.cshp.common.dto.UserDTO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

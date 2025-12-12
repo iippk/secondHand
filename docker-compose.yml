@@ -1,0 +1,419 @@
+version: '3.8'
+
+# 全局配置
+x-common-config:
+  &common-config
+  networks:
+    - cshp-network
+  restart: always
+
+# 自定义网络
+networks:
+  cshp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 数据卷
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-data:
+  sentinel-data:
+  frontend-dist:
+
+# 服务配置
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0.33
+    container_name: mysql
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./frontend/cshp.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=cshp
+      - TZ=Asia/Shanghai
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+8:00
+      --skip-ssl
+      --require_secure_transport=OFF
+      --default_authentication_plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis缓存
+  redis:
+    image: redis:7.0.11-alpine
+    container_name: redis
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command:
+      --requirepass redis123
+      --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Nacos注册中心
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: nacos
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      - nacos-data:/home/nacos/data
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_ENABLE=false
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=mysql
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_DB_NAME=nacos
+      - MYSQL_SERVICE_USER=root
+      - MYSQL_SERVICE_PASSWORD=123456
+      - MYSQL_SERVICE_DB_PARAM=characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true
+      - JVM_XMS=512m
+      - JVM_XMX=512m
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/"]
+      interval: 10s
+      timeout: 15s
+      retries: 20
+
+  # Sentinel流量控制
+  sentinel:
+    image: bladex/sentinel-dashboard:1.8.9
+    container_name: sentinel
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "18080:8858"
+    volumes:
+      - sentinel-data:/tmp
+    environment:
+      - TZ=Asia/Shanghai
+      - JAVA_OPTS=-Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858 -Dproject.name=sentinel-dashboard -Djava.security.egd=file:/dev/./urandom
+    depends_on:
+      nacos:
+        condition: service_healthy
+
+  # 后端微服务 - 网关服务
+  gateway-service:
+    build:
+      context: .
+      dockerfile: backend/gateway-service/Dockerfile
+    container_name: gateway-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_PASSWORD=nacos
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_APPLICATION_NAME=gateway-service
+    depends_on:
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 后端微服务 - 用户服务
+  user-service:
+    build:
+      context: .
+      dockerfile: backend/user-service/Dockerfile
+    container_name: user-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8081:8081"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_PASSWORD=nacos
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=redis123
+      - SPRING_APPLICATION_NAME=user-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 后端微服务 - 商品服务
+  product-service:
+    build:
+      context: .
+      dockerfile: backend/product-service/Dockerfile
+    container_name: product-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8082:8082"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_PASSWORD=nacos
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_APPLICATION_NAME=product-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 后端微服务 - 订单服务
+  order-service:
+    build:
+      context: .
+      dockerfile: backend/order-service/Dockerfile
+    container_name: order-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8083:8083"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_PASSWORD=nacos
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_APPLICATION_NAME=order-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 后端微服务 - 搜索服务
+  search-service:
+    build:
+      context: . 
+      dockerfile: backend/search-service/Dockerfile
+    container_name: search-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8084:8084"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_USERNAME=nacos
+      - SPRING_CLOUD_NACOS_CONFIG_PASSWORD=nacos
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SPRING_APPLICATION_NAME=search-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+
+  # 后端微服务 - 聊天服务
+  chat-service:
+    build:
+      context: .
+      dockerfile: backend/chat-service/Dockerfile
+    container_name: chat-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8085:8085"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_APPLICATION_NAME=chat-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 后端微服务 - 购物车服务
+  cart-service:
+    build:
+      context: .
+      dockerfile: backend/cart-service/Dockerfile
+    container_name: cart-service
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8086:8086"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=redis123
+      - SPRING_APPLICATION_NAME=cart-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 后端微服务 - AI服务
+  ai-service2:
+    build:
+      context: .
+      dockerfile: backend/ai-service2/Dockerfile
+    container_name: ai-service2
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "8087:8087"
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD=sentinel:8858
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_APPLICATION_NAME=ai-service2
+      - AI_API_KEY=${AI_API_KEY:-your-api-key-here}
+      - AI_MODEL=${AI_MODEL:-gpt-3.5-turbo}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      sentinel:
+        condition: service_started
+
+  # 前端Vue应用
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    networks:
+      - cshp-network
+    ports:
+      - "80:80"
+      - "3000:3000"
+    volumes:
+      - frontend-dist:/usr/share/nginx/html
+    environment:
+      - VITE_API_BASE_URL=http://gateway-service:8080  # ✅ 容器间通信使用服务名
+      - VITE_APP_BASE_URL=http://localhost:80           # 对外访问的地址
+      - VITE_APP_TITLE=CSHP Shopping Platform
+    depends_on:
+      - gateway-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

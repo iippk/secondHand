@@ -14,7 +14,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:nacos:8848}
+        username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
+        password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
     sentinel:
       transport:
         dashboard: localhost:18080
@@ -56,6 +58,14 @@ spring:
             - Path=/api/search-service/**
           filters:
             - StripPrefix=2
+        
+        # 图片上传路径转发
+        - id: product-service-uploads
+          uri: lb://product-service
+          predicates:
+            - Path=/uploads/**
+          filters:
+            - StripPrefix=0
         - id: chat-service
           uri: lb://chat-service
           predicates:
@@ -91,3 +101,12 @@ spring:
 jwt:
   secret: cshp-secret-key-for-jwt-token-generation-2024
   expiration: 86400000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+  endpoint:
+    health:
+      show-details: always

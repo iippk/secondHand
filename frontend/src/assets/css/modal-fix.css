@@ -1,0 +1,81 @@
+/* modal-fix.css - 全局修复遮罩层层级问题 */
+
+/* 1. 强制遮罩层覆盖整个页面 */
+.el-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 2000 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+/* 2. Element Plus 默认遮罩层 */
+.v-modal {
+  z-index: 2000 !important;
+}
+
+/* 3. 弹窗和抽屉层级 */
+.el-dialog,
+.el-drawer {
+  z-index: 2001 !important;
+}
+
+.el-drawer__wrapper {
+  z-index: 2001 !important;
+}
+
+/* 4. 下拉框等弹出组件 */
+.el-select-dropdown,
+.el-popper,
+.el-tooltip__popper {
+  z-index: 2002 !important;
+}
+
+/* 5. 确保页面内容层级低于遮罩层 */
+.home-container,
+.my-buy-container,
+.my-sell-container,
+.main-content {
+  position: relative;
+  z-index: 1 !important;
+}
+
+/* 6. 卡片组件层级重置 */
+.el-card {
+  position: relative;
+  z-index: 1 !important;
+}
+
+.el-card__body {
+  position: relative;
+  z-index: auto !important;
+}
+
+/* 7. 消息列表特定样式 */
+.message-list-container {
+  position: relative;
+  z-index: 2001 !important;
+}
+
+/* 8. 当有遮罩层时，页面内容变暗 */
+body.modal-open .el-card,
+body.modal-open .main-content,
+body.modal-open .content-card {
+  opacity: 0.8 !important;
+  filter: brightness(0.95) !important;
+}
+
+/* 9. 覆盖 Element Plus 可能的内联样式 */
+[style*="z-index: 100"] {
+  z-index: 2000 !important;
+}
+
+/* 10. 响应式调整 */
+@media (max-width: 768px) {
+  .el-overlay {
+    backdrop-filter: blur(2px) !important;
+  }
+}

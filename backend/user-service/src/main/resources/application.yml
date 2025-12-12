@@ -6,21 +6,25 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:nacos:8848}
+        username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
+        password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
     sentinel:
       transport:
-        dashboard: localhost:18080
+        dashboard: sentinel:8858
       datasource:
         # 数据源名称，可自定义，如 ds-nacos
         ds-nacos:
           nacos:
-            server-addr: localhost:8848 # Nacos地址
+            server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:nacos:8848} # Nacos地址
+            username: ${SPRING_CLOUD_NACOS_DISCOVERY_USERNAME:nacos}
+            password: ${SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD:nacos}
             dataId: user-service-sentinel-flow # 与Nacos中创建的Data ID一致
             groupId: DEFAULT_GROUP
             data-type: json
             rule-type: flow # 规则类型：流控规则
   datasource:
-    url: jdbc:mysql://localhost:3306/cshp?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://mysql:3306/cshp?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver

@@ -1108,10 +1108,9 @@ watch(() => route.name, (newRouteName, oldRouteName) => {
   color: #666;
   margin-bottom: 12px;
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: nowrap;          /* 不换行 */
+  overflow: hidden;             /* 超出部分隐藏 */
+  text-overflow: ellipsis; 
 }
 
 .product-meta {

@@ -1,6 +1,6 @@
 package com.cshp.product.client;
 
-import com.cshp.user.dto.UserDTO;
+import com.cshp.common.dto.UserDTO;
 import lombok.Data;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
